@@ -9,7 +9,9 @@ from langchain.schema import (
     SystemMessage
 )
 from langchain.document_loaders import PyPDFLoader
-from langchain.document_loaders import WebBaseLoader
+from langchain.document_loaders import WebBaseLoader, UnstructuredURLLoader
+import requests
+from bs4 import BeautifulSoup
 
 from dotenv import load_dotenv
 
@@ -39,15 +41,51 @@ WEBSITE_URLS = WEBSITE_URL.split(",")
 embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
 chat = ChatOpenAI(temperature=0, openai_api_key=OPENAI_API_KEY)
 
+
 # Load pages from a PDF
 # loader = PyPDFLoader("data/National Budget Speech FY2022-23 English Version.pdf")
 # pages = loader.load_and_split()
 
 # Load pages from a website
-loader = WebBaseLoader(WEBSITE_URLS)
+
+
+def extract_links(url):
+    """
+    Extract all links from a website
+    :param url: Website URL
+    :return: List of links
+    """
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    links = []
+    for link in soup.find_all('a'):
+        href = link.get('href')
+        if href:
+            links.append(href)
+
+    return links
+
+
+def extract_links_from_websites(websites):
+    """
+    Extract all links from a list of websites
+    :param websites:  List of websites
+    :return: List of links
+    """
+    all_links = []
+
+    for website in websites:
+        links = extract_links(website)
+        all_links.extend(links)
+
+    return all_links
+
+
+loader = UnstructuredURLLoader(urls=extract_links_from_websites(WEBSITE_URLS))
 pages = loader.load_and_split()
 
-faiss_obj_path = "models/buffer_salaries.pickle"
+faiss_obj_path = "models/langchain.pickle"
 
 if os.path.exists(faiss_obj_path):
     # Load the FAISS object from disk
