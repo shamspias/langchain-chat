@@ -28,4 +28,4 @@ langchain-chat is a powerful AI-driven Q&A system that leverages OpenAI's GPT-4 
     ```
 
 ## Example Images
-![Example 1](https://i.imgur.com/0Z0Z0Z0.png)
+![Example 1](https://github.com/shamspias/langchain-chat/blob/main/images/conversation.PNG)
