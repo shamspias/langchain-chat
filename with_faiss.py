@@ -1,5 +1,6 @@
 import os
 import pickle
+import requests
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS as FISS
 from langchain.chat_models import ChatOpenAI
@@ -10,8 +11,9 @@ from langchain.schema import (
 )
 from langchain.document_loaders import PyPDFLoader
 from langchain.document_loaders import WebBaseLoader, UnstructuredURLLoader
-import requests
+
 from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlsplit
 
 from dotenv import load_dotenv
 
@@ -48,12 +50,17 @@ chat = ChatOpenAI(temperature=0, openai_api_key=OPENAI_API_KEY)
 
 # Load pages from a website
 
+def is_valid_url(url):
+    """
+    Check if a URL is valid
+    """
+    parsed_url = urlsplit(url)
+    return bool(parsed_url.scheme) and bool(parsed_url.netloc)
+
 
 def extract_links(url):
     """
-    Extract all links from a website
-    :param url: Website URL
-    :return: List of links
+    Extract all links from a URL
     """
     response = requests.get(url)
     soup = BeautifulSoup(response.text, 'html.parser')
@@ -62,7 +69,9 @@ def extract_links(url):
     for link in soup.find_all('a'):
         href = link.get('href')
         if href:
-            links.append(href)
+            absolute_url = urljoin(url, href)
+            if is_valid_url(absolute_url):
+                links.append(absolute_url)
 
     return links
 
@@ -70,8 +79,6 @@ def extract_links(url):
 def extract_links_from_websites(websites):
     """
     Extract all links from a list of websites
-    :param websites:  List of websites
-    :return: List of links
     """
     all_links = []
 
@@ -82,7 +89,7 @@ def extract_links_from_websites(websites):
     return all_links
 
 
-loader = UnstructuredURLLoader(urls=extract_links_from_websites(WEBSITE_URLS))
+loader = WebBaseLoader(extract_links_from_websites(WEBSITE_URLS))
 pages = loader.load_and_split()
 
 faiss_obj_path = "models/langchain.pickle"
