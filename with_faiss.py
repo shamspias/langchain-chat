@@ -89,9 +89,6 @@ def extract_links_from_websites(websites):
     return all_links
 
 
-loader = WebBaseLoader(extract_links_from_websites(WEBSITE_URLS))
-pages = loader.load_and_split()
-
 faiss_obj_path = "models/langchain.pickle"
 
 if os.path.exists(faiss_obj_path):
@@ -99,13 +96,17 @@ if os.path.exists(faiss_obj_path):
     faiss_index = FAISS.load(faiss_obj_path)
 else:
     # Build and save the FAISS object
+    loader = WebBaseLoader(extract_links_from_websites(WEBSITE_URLS))
+    pages = loader.load_and_split()
+
     faiss_index = FAISS.from_documents(pages, embeddings, index_name="buffer_salaries")
     faiss_index.save(faiss_obj_path)
 
 messages = [
     SystemMessage(
-        content="You are a helpful assistant that know everything about buffer.com. You can answer any question about "
-                "the salaries of the employees."),
+        content="You are a helpful assistant that know everything about langchain.You can also answer questions about "
+                "the langchain library. You write code with proper explanation and understand the code bug and can "
+                "fixed it or give solution")
 ]
 
 while True:
