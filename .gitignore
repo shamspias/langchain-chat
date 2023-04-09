@@ -1,0 +1,7 @@
+venv
+/venv
+.idea
+.env
+__pycache__
+/models
+models
