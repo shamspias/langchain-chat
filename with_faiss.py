@@ -96,17 +96,17 @@ def get_loader(file_path_or_url):
             raise ValueError(f"Unsupported file type: {mime_type}")
 
 
-def train_or_load_model(train, faiss_obj_path, file_path):
+def train_or_load_model(train, faiss_obj_path, file_path, index_name):
     if train:
         loader = get_loader(file_path)
         pages = loader.load_and_split()
 
         if os.path.exists(faiss_obj_path):
             faiss_index = FAISS.load(faiss_obj_path)
-            new_embeddings = faiss_index.from_documents(pages, embeddings, index_name="langchain", dimension=1536)
+            new_embeddings = faiss_index.from_documents(pages, embeddings, index_name=index_name, dimension=1536)
             new_embeddings.save(faiss_obj_path)
         else:
-            faiss_index = FAISS.from_documents(pages, embeddings, index_name="langchain", dimension=1536)
+            faiss_index = FAISS.from_documents(pages, embeddings, index_name=index_name, dimension=1536)
             faiss_index.save(faiss_obj_path)
 
         return FAISS.load(faiss_obj_path)
@@ -143,9 +143,10 @@ def answer_questions(faiss_index):
 def main():
     faiss_obj_path = "models/langchain.pickle"
     file_path = "data/3.pdf"
+    index_name = "langchain"
 
     train = int(input("Do you want to train the model? (1 for yes, 0 for no): "))
-    faiss_index = train_or_load_model(train, faiss_obj_path, file_path)
+    faiss_index = train_or_load_model(train, faiss_obj_path, file_path, index_name)
     answer_questions(faiss_index)
 
 
