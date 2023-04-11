@@ -123,7 +123,7 @@ def train_or_load_model(train, _index, file_path, index_name, name_space):
                                                      namespace=name_space)
         return pinecone_index
     else:
-        pinecone_index = get_pinecone_index(index_name)
+        pinecone_index = pinecone.Index(index_name=index_name)
         return pinecone_index
 
 
@@ -137,7 +137,7 @@ def answer_questions(pinecone_index):
         if question.lower() == "stop":
             break
 
-        docs = pinecone_index.similarity_search(query=question, k=2)
+        docs = pinecone_index.similarity_search(query=question, k=1)
 
         main_content = question + "\n\n"
         for doc in docs:
@@ -154,7 +154,7 @@ def answer_questions(pinecone_index):
 
 def main():
     _index = get_pinecone_index(PINECONE_INDEX_NAME)
-    file_path = "data/sam.pdf"
+    file_path = "data/shinty.pdf"
     index_name = PINECONE_INDEX_NAME
     name_space = "localproject"
 
