@@ -1,11 +1,12 @@
 import os
 import pinecone
+import pickle
 import mimetypes
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlsplit
 from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import Pinecone
+from langchain.vectorstores import Pinecone as Pinec
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import (
     AIMessage,
@@ -35,7 +36,10 @@ embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
 chat = ChatOpenAI(temperature=0, openai_api_key=OPENAI_API_KEY)
 
 # Initialize Pinecone
-pinecone.init(api_key=PINECONE_API_KEY, environment=PINECONE_ENVIRONMENT)
+pinecone.init(
+    api_key=PINECONE_API_KEY,
+    environment=PINECONE_ENVIRONMENT
+)
 
 # Get a list of Pinecone indexes
 active_indexes = pinecone.list_indexes()
@@ -48,6 +52,17 @@ if not index_exists:
     index = pinecone.create_index(name=PINECONE_INDEX_NAME, dimension=1536, metric="cosine")
 else:
     index = pinecone.Index(index_name=PINECONE_INDEX_NAME)
+
+
+class Pinecone(Pinec):
+    def save(self, file_path):
+        with open(file_path, "wb") as f:
+            pickle.dump(self, f)
+
+    @staticmethod
+    def load(file_path):
+        with open(file_path, "rb") as f:
+            return pickle.load(f)
 
 
 class URLHandler:
@@ -100,6 +115,24 @@ def get_loader(file_path_or_url):
             raise ValueError(f"Unsupported file type: {mime_type}")
 
 
+def train_or_load_model(train, pinecone_obj_path, file_path, index_name):
+    if train:
+        loader = get_loader(file_path)
+        pages = loader.load_and_split()
+
+        if os.path.exists(pinecone_obj_path):
+            pinecone_index = Pinecone.load(pinecone_obj_path)
+            new_embeddings = pinecone_index.from_documents(pages, embeddings, index_name=index_name)
+            new_embeddings.save(pinecone_obj_path)
+        else:
+            pinecone_index = Pinecone.from_documents(pages, embeddings, index_name=index_name)
+            pinecone_index.save(pinecone_obj_path)
+
+        return Pinecone.load(pinecone_obj_path)
+    else:
+        return Pinecone.load(pinecone_obj_path)
+
+
 def answer_questions(pinecone_index):
     messages = [
         SystemMessage(
@@ -124,3 +157,17 @@ def answer_questions(pinecone_index):
         messages.append(AIMessage(content=ai_response))
 
         print(ai_response)
+
+
+def main():
+    faiss_obj_path = "models/personal.pickle"
+    file_path = "data/sam.pdf"
+    index_name = index
+
+    train = int(input("Do you want to train the model? (1 for yes, 0 for no): "))
+    pinecone_index = train_or_load_model(train, faiss_obj_path, file_path, index_name)
+    answer_questions(pinecone_index)
+
+
+if __name__ == "__main__":
+    main()
