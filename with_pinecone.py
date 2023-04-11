@@ -123,7 +123,7 @@ def train_or_load_model(train, _index, file_path, index_name, name_space):
                                                      namespace=name_space)
         return pinecone_index
     else:
-        pinecone_index = pinecone.Index(index_name=index_name)
+        pinecone_index = Pinecone.from_existing_index(index_name=index_name, namespace=name_space, embedding=embeddings)
         return pinecone_index
 
 
