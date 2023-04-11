@@ -1,6 +1,9 @@
 import os
 import pickle
+import faiss
+import numpy as np
 import requests
+import mimetypes
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS as FISS
 from langchain.chat_models import ChatOpenAI
@@ -11,6 +14,8 @@ from langchain.schema import (
 )
 from langchain.document_loaders import PyPDFLoader
 from langchain.document_loaders import WebBaseLoader, UnstructuredURLLoader
+from langchain.document_loaders.csv_loader import CSVLoader
+from langchain.document_loaders import UnstructuredWordDocumentLoader
 
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlsplit
@@ -44,9 +49,18 @@ embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
 chat = ChatOpenAI(temperature=0, openai_api_key=OPENAI_API_KEY)
 
 
-# Load pages from a PDF
-# loader = PyPDFLoader("data/National Budget Speech FY2022-23 English Version.pdf")
-# pages = loader.load_and_split()
+def get_loader(file_path):
+    mime_type, _ = mimetypes.guess_type(file_path)
+
+    if mime_type == 'application/pdf':
+        return PyPDFLoader(file_path)
+    elif mime_type == 'text/csv':
+        return CSVLoader(file_path)
+    elif mime_type in ['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
+        return UnstructuredWordDocumentLoader(file_path)
+    else:
+        raise ValueError(f"Unsupported file type: {mime_type}")
+
 
 # Load pages from a website
 
@@ -89,24 +103,38 @@ def extract_links_from_websites(websites):
     return all_links
 
 
-faiss_obj_path = "models/langchain.pickle"
-
-if os.path.exists(faiss_obj_path):
-    # Load the FAISS object from disk
-    faiss_index = FAISS.load(faiss_obj_path)
-else:
-    # Build and save the FAISS object
-    loader = WebBaseLoader(extract_links_from_websites(WEBSITE_URLS))
+train = int(input("Do you want to train the model? (1 for yes, 0 for no): "))
+if train:
+    faiss_obj_path = "models/langchain.pickle"
+    loader = get_loader("data/3.pdf")
     pages = loader.load_and_split()
 
-    faiss_index = FAISS.from_documents(pages, embeddings, index_name="buffer_salaries")
-    faiss_index.save(faiss_obj_path)
+    if os.path.exists(faiss_obj_path):
+        # Load the FAISS object from disk
+        faiss_index = FAISS.load(faiss_obj_path)
+        # make new embeddings
+        new_embeddings = faiss_index.from_documents(pages, embeddings, index_name="langchain", dimension=1536)
+
+        # Add the new embeddings to the FAISS object
+        # new_faiss_index = merge_vectors(faiss_index.index, new_embeddings.index)
+        # faiss_index.index = new_faiss_index
+
+        # Save the FAISS object
+        new_embeddings.save(faiss_obj_path)
+
+    else:
+        # Build and save the FAISS object
+
+        faiss_index = FAISS.from_documents(pages, embeddings, index_name="langchain", dimension=1536)
+        faiss_index.save(faiss_obj_path)
+
+else:
+    faiss_obj_path = "models/langchain.pickle"
+    faiss_index = FAISS.load(faiss_obj_path)
 
 messages = [
     SystemMessage(
-        content="You are a helpful assistant that know everything about langchain.You can also answer questions about "
-                "the langchain library. You write code with proper explanation and understand the code bug and can "
-                "fixed it or give solution")
+        content="You know everything about langchain and you can give any solution and write code for any problem.")
 ]
 
 while True:
