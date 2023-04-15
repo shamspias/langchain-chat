@@ -117,7 +117,7 @@ def train_or_load_model(train, faiss_obj_path, file_path, index_name):
 def answer_questions(faiss_index):
     messages = [
         SystemMessage(
-            content="You know everything about langchain and you can give any solution and write code for any problem.")
+            content="You very friendly and analytic AI bot. you can answer any questions about the client.")
     ]
 
     while True:
@@ -141,9 +141,9 @@ def answer_questions(faiss_index):
 
 
 def main():
-    faiss_obj_path = "models/langchain.pickle"
-    file_path = "data/3.pdf"
-    index_name = "langchain"
+    faiss_obj_path = "models/bui.pickle"
+    file_path = "data/client.pdf"
+    index_name = "bui"
 
     train = int(input("Do you want to train the model? (1 for yes, 0 for no): "))
     faiss_index = train_or_load_model(train, faiss_obj_path, file_path, index_name)
