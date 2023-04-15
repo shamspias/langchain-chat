@@ -9,7 +9,7 @@ from urllib.parse import urljoin, urlsplit
 from dotenv import load_dotenv
 
 from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import FAISS as FISS
+from langchain.vectorstores import FAISS as BaseFAISS
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import AIMessage, HumanMessage, SystemMessage
 from langchain.document_loaders import (
@@ -35,7 +35,7 @@ class DocumentLoader(ABC):
         pass
 
 
-class FAISS(FISS):
+class FAISS(BaseFAISS):
     def save(self, file_path):
         with open(file_path, "wb") as f:
             pickle.dump(self, f)
@@ -117,7 +117,8 @@ def train_or_load_model(train, faiss_obj_path, file_path, index_name):
 def answer_questions(faiss_index):
     messages = [
         SystemMessage(
-            content="You very friendly and analytic AI bot. you can answer any questions about the client.")
+            content="You very friendly and analytic AI bot. you can answer any questions about the client also give "
+                    "all information about them.")
     ]
 
     while True:
