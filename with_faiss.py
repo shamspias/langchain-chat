@@ -117,8 +117,10 @@ def train_or_load_model(train, faiss_obj_path, file_path, index_name):
 def answer_questions(faiss_index):
     messages = [
         SystemMessage(
-            content="You very friendly and analytic AI bot. you can answer any questions about the client also give "
-                    "all information about them.")
+            content='I want you to act as a document that I am having a conversation with. Your name is "AI '
+                    'Assistant". You will provide me with answers from the given info. If the answer is not included, '
+                    'say exactly "Hmm, I am not sure." and stop after that. Refuse to answer any question not about '
+                    'the info. Never break character.')
     ]
 
     while True:
@@ -142,9 +144,9 @@ def answer_questions(faiss_index):
 
 
 def main():
-    faiss_obj_path = "models/bui.pickle"
-    file_path = "data/client.pdf"
-    index_name = "bui"
+    faiss_obj_path = "models/sukoon.pickle"
+    file_path = "data/sukoon.pdf"
+    index_name = "sukoon"
 
     train = int(input("Do you want to train the model? (1 for yes, 0 for no): "))
     faiss_index = train_or_load_model(train, faiss_obj_path, file_path, index_name)

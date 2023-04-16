@@ -131,7 +131,7 @@ def train_or_load_model(train, pinecone_index_manager, file_path, name_space):
 
         else:
             print("Training the model")
-            pinecone_index_manager.create_index(dimension=1536, metric="cosine")
+            pinecone_index_manager.create_index(dimension=1531, metric="cosine")
             pinecone_index = Pinecone.from_documents(documents=pages, embedding=embeddings,
                                                      index_name=pinecone_index_manager.index_name,
                                                      namespace=name_space)
@@ -145,7 +145,10 @@ def train_or_load_model(train, pinecone_index_manager, file_path, name_space):
 def answer_questions(pinecone_index):
     messages = [
         SystemMessage(
-            content="You are a good at resume analysis you can analysis any resume and give good output.")
+            content='I want you to act as a document that I am having a conversation with. Your name is "AI '
+                    'Assistant". You will provide me with answers from the given info. If the answer is not included, '
+                    'say exactly "Hmm, I am not sure." and stop after that. Refuse to answer any question not about '
+                    'the info. Never break character.')
     ]
     while True:
         question = input("Ask a question (type 'stop' to end): ")
@@ -170,8 +173,8 @@ def answer_questions(pinecone_index):
 def main():
     pinecone_manager = PineconeManager(PINECONE_API_KEY, PINECONE_ENVIRONMENT)
     pinecone_index_manager = PineconeIndexManager(pinecone_manager, PINECONE_INDEX_NAME)
-    file_path = "data/shinty.pdf"
-    name_space = "localproject"
+    file_path = "data/motor1.pdf"
+    name_space = "insurance"
 
     train = int(input("Do you want to train the model? (1 for yes, 0 for no): "))
     pinecone_index = train_or_load_model(train, pinecone_index_manager, file_path, name_space)
