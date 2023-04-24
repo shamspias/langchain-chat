@@ -62,7 +62,8 @@ class URLHandler:
             href = link.get('href')
             if href:
                 absolute_url = urljoin(url, href)
-                if URLHandler.is_valid_url(absolute_url):
+                if URLHandler.is_valid_url(absolute_url) and (
+                        absolute_url.startswith("http://") or absolute_url.startswith("https://")):
                     links.append(absolute_url)
 
         return links
@@ -144,9 +145,9 @@ def answer_questions(faiss_index):
 
 
 def main():
-    faiss_obj_path = "models/sukoon.pickle"
-    file_path = "data/sukoon.pdf"
-    index_name = "sukoon"
+    faiss_obj_path = "models/test.pickle"
+    file_path = "https://test.com"
+    index_name = "test"
 
     train = int(input("Do you want to train the model? (1 for yes, 0 for no): "))
     faiss_index = train_or_load_model(train, faiss_obj_path, file_path, index_name)
