@@ -22,8 +22,8 @@ from langchain.document_loaders import (
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv('OPEN_AI_KEY')
-WEBSITE_URL = os.getenv('WEBSITE_URLS')
-WEBSITE_URLS = WEBSITE_URL.split(",")
+# WEBSITE_URL = os.getenv('WEBSITE_URLS')
+# WEBSITE_URLS = WEBSITE_URL.split(",")
 
 embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
 chat = ChatOpenAI(temperature=0, openai_api_key=OPENAI_API_KEY)
@@ -140,14 +140,15 @@ def answer_questions(faiss_index):
         messages.pop()
         messages.append(HumanMessage(content=question))
         messages.append(AIMessage(content=ai_response))
+        print(chat)
 
         print(ai_response)
 
 
 def main():
-    faiss_obj_path = "models/test.pickle"
+    faiss_obj_path = "models/langchain.pickle"
     file_path = "https://test.com"
-    index_name = "test"
+    index_name = "langchain"
 
     train = int(input("Do you want to train the model? (1 for yes, 0 for no): "))
     faiss_index = train_or_load_model(train, faiss_obj_path, file_path, index_name)
