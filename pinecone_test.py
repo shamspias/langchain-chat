@@ -27,8 +27,8 @@ OPENAI_API_KEY = os.getenv('OPEN_AI_KEY')
 PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
 PINECONE_ENVIRONMENT = os.getenv('PINECONE_ENVIRONMENT')
 PINECONE_INDEX_NAME = os.getenv('PINECONE_INDEX_NAME')
-WEBSITE_URL = os.getenv('WEBSITE_URLS')
-WEBSITE_URLS = WEBSITE_URL.split(",")
+# WEBSITE_URL = os.getenv('WEBSITE_URLS')
+# WEBSITE_URLS = WEBSITE_URL.split(",")
 
 embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
 chat = ChatOpenAI(temperature=0, openai_api_key=OPENAI_API_KEY)
@@ -173,8 +173,8 @@ def answer_questions(pinecone_index):
 def main():
     pinecone_manager = PineconeManager(PINECONE_API_KEY, PINECONE_ENVIRONMENT)
     pinecone_index_manager = PineconeIndexManager(pinecone_manager, PINECONE_INDEX_NAME)
-    file_path = "data/motor1.pdf"
-    name_space = "insurance"
+    file_path = "data/cuet.pdf"
+    name_space = "cuet"
 
     train = int(input("Do you want to train the model? (1 for yes, 0 for no): "))
     pinecone_index = train_or_load_model(train, pinecone_index_manager, file_path, name_space)
