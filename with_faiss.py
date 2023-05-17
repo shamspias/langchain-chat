@@ -5,7 +5,7 @@ from typing import List
 import requests
 import mimetypes
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urljoin, urlparse
 from dotenv import load_dotenv
 
 from langchain.embeddings import OpenAIEmbeddings
@@ -49,24 +49,34 @@ class FAISS(BaseFAISS):
 class URLHandler:
     @staticmethod
     def is_valid_url(url):
-        parsed_url = urlsplit(url)
-        return bool(parsed_url.scheme) and bool(parsed_url.netloc)
+        parsed = urlparse(url)
+        return bool(parsed.netloc) and bool(parsed.scheme)
 
     @staticmethod
     def extract_links(url):
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, 'html.parser')
+        urls = set()
+        domain_name = urlparse(url).netloc
+        soup = BeautifulSoup(requests.get(url).content, "html.parser")
 
-        links = []
-        for link in soup.find_all('a'):
-            href = link.get('href')
-            if href:
-                absolute_url = urljoin(url, href)
-                if URLHandler.is_valid_url(absolute_url) and (
-                        absolute_url.startswith("http://") or absolute_url.startswith("https://")):
-                    links.append(absolute_url)
-
-        return links
+        for a_tag in soup.findAll("a"):
+            href = a_tag.attrs.get("href")
+            if href == "" or href is None:
+                continue
+            href = urljoin(url, href)
+            parsed_href = urlparse(href)
+            # Checking file extension
+            if parsed_href.path.endswith(
+                    ('.pdf', '.jpg', '.png', '.jpeg', '.gif', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx')):
+                continue
+            href = parsed_href.scheme + "://" + parsed_href.netloc + parsed_href.path
+            if not URLHandler.is_valid_url(href):
+                continue
+            if href in urls:
+                continue
+            if domain_name not in href:
+                continue
+            urls.add(href)
+        return urls
 
     @staticmethod
     def extract_links_from_websites(websites):
@@ -104,10 +114,10 @@ def train_or_load_model(train, faiss_obj_path, file_path, index_name):
 
         if os.path.exists(faiss_obj_path):
             faiss_index = FAISS.load(faiss_obj_path)
-            new_embeddings = faiss_index.from_documents(pages, embeddings, index_name=index_name, dimension=1536)
+            new_embeddings = faiss_index.from_documents(pages, embeddings)
             new_embeddings.save(faiss_obj_path)
         else:
-            faiss_index = FAISS.from_documents(pages, embeddings, index_name=index_name, dimension=1536)
+            faiss_index = FAISS.from_documents(pages, embeddings)
             faiss_index.save(faiss_obj_path)
 
         return FAISS.load(faiss_obj_path)
@@ -146,9 +156,9 @@ def answer_questions(faiss_index):
 
 
 def main():
-    faiss_obj_path = "models/langchain.pickle"
-    file_path = "https://test.com"
-    index_name = "langchain"
+    faiss_obj_path = "models/ycla.pickle"
+    file_path = "https://ycla-coding.com"
+    index_name = "ycla"
 
     train = int(input("Do you want to train the model? (1 for yes, 0 for no): "))
     faiss_index = train_or_load_model(train, faiss_obj_path, file_path, index_name)
