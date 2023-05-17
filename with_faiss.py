@@ -1,5 +1,9 @@
 import os
+import sys
 import pickle
+import pyppeteer
+import asyncio
+import logging
 from abc import ABC, abstractmethod
 from typing import List
 import requests
@@ -16,17 +20,44 @@ from langchain.document_loaders import (
     PyPDFLoader,
     CSVLoader,
     UnstructuredWordDocumentLoader,
-    WebBaseLoader,
+    WebBaseLoader as BaseWebBaseLoader,
 )
 
 load_dotenv()
-
+logger = logging.getLogger(__name__)
 OPENAI_API_KEY = os.getenv('OPEN_AI_KEY')
 # WEBSITE_URL = os.getenv('WEBSITE_URLS')
 # WEBSITE_URLS = WEBSITE_URL.split(",")
 
 embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
 chat = ChatOpenAI(temperature=0, openai_api_key=OPENAI_API_KEY)
+
+
+class WebBaseLoader(BaseWebBaseLoader):
+
+    async def _fetch(
+            self, url: str, selector: str = 'body', retries: int = 3, cooldown: int = 2, backoff: float = 1.5
+    ) -> str:
+        for i in range(retries):
+            try:
+                browser = await pyppeteer.launch()
+                page = await browser.newPage()
+                await page.goto(url)
+                await page.waitForSelector(selector)  # waits for a specific element to be loaded
+                await asyncio.sleep(5)  # waits for 5 seconds before getting the content
+                content = await page.content()  # This gets the full HTML, including any dynamically loaded content
+                await browser.close()
+                return content
+            except Exception as e:
+                if i == retries - 1:
+                    raise
+                else:
+                    logger.warning(
+                        f"Error fetching {url} with attempt "
+                        f"{i + 1}/{retries}: {e}. Retrying..."
+                    )
+                    await asyncio.sleep(cooldown * backoff ** i)
+        raise ValueError("retry count exceeded")
 
 
 class DocumentLoader(ABC):
@@ -64,7 +95,6 @@ class URLHandler:
                 continue
             href = urljoin(url, href)
             parsed_href = urlparse(href)
-            # Checking file extension
             if parsed_href.path.endswith(
                     ('.pdf', '.jpg', '.png', '.jpeg', '.gif', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx')):
                 continue
@@ -80,13 +110,13 @@ class URLHandler:
 
     @staticmethod
     def extract_links_from_websites(websites):
-        all_links = []
+        all_links = set()
 
         for website in websites:
             links = URLHandler.extract_links(website)
-            all_links.extend(links)
+            all_links.update(links)
 
-        return all_links
+        return list(all_links)
 
 
 def get_loader(file_path_or_url):
@@ -111,6 +141,13 @@ def train_or_load_model(train, faiss_obj_path, file_path, index_name):
     if train:
         loader = get_loader(file_path)
         pages = loader.load_and_split()
+
+        # Save pages to a text file
+        with open('output.txt', 'w', encoding='utf-8') as f:
+            sys.stdout = f  # Redirect standard output to the file
+            print(pages)  # The output will be saved to 'output.txt'
+
+            sys.stdout = sys.__stdout__  # Reset standard output
 
         if os.path.exists(faiss_obj_path):
             faiss_index = FAISS.load(faiss_obj_path)
