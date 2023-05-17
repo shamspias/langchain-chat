@@ -194,7 +194,7 @@ def answer_questions(faiss_index):
 
 def main():
     faiss_obj_path = "models/ycla.pickle"
-    file_path = "https://ycla-coding.com"
+    file_path = "https://test.com"
     index_name = "ycla"
 
     train = int(input("Do you want to train the model? (1 for yes, 0 for no): "))
