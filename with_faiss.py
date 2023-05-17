@@ -23,6 +23,14 @@ from langchain.document_loaders import (
     WebBaseLoader as BaseWebBaseLoader,
 )
 
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import time
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 OPENAI_API_KEY = os.getenv('OPEN_AI_KEY')
@@ -35,18 +43,24 @@ chat = ChatOpenAI(temperature=0, openai_api_key=OPENAI_API_KEY)
 
 class WebBaseLoader(BaseWebBaseLoader):
 
-    async def _fetch(
+    def _fetch(
             self, url: str, selector: str = 'body', retries: int = 3, cooldown: int = 2, backoff: float = 1.5
     ) -> str:
         for i in range(retries):
             try:
-                browser = await pyppeteer.launch()
-                page = await browser.newPage()
-                await page.goto(url)
-                await page.waitForSelector(selector)  # waits for a specific element to be loaded
-                await asyncio.sleep(5)  # waits for 5 seconds before getting the content
-                content = await page.content()  # This gets the full HTML, including any dynamically loaded content
-                await browser.close()
+                webdriver_service = Service('C:/WebDrivers/chromedriver.exe')  # Update this path
+                options = webdriver.ChromeOptions()
+                options.add_argument('headless')
+                driver = webdriver.Chrome(service=webdriver_service, options=options)
+                driver.get(url)
+
+                # Wait until the specific element is visible on the page
+                WebDriverWait(driver, timeout=500).until(
+                    EC.visibility_of_element_located((By.CSS_SELECTOR, selector))
+                )
+
+                content = driver.page_source
+                driver.quit()
                 return content
             except Exception as e:
                 if i == retries - 1:
@@ -56,7 +70,7 @@ class WebBaseLoader(BaseWebBaseLoader):
                         f"Error fetching {url} with attempt "
                         f"{i + 1}/{retries}: {e}. Retrying..."
                     )
-                    await asyncio.sleep(cooldown * backoff ** i)
+                    time.sleep(cooldown * backoff ** i)
         raise ValueError("retry count exceeded")
 
 
@@ -194,7 +208,7 @@ def answer_questions(faiss_index):
 
 def main():
     faiss_obj_path = "models/ycla.pickle"
-    file_path = "https://test.com"
+    file_path = "https://yoursitecom"
     index_name = "ycla"
 
     train = int(input("Do you want to train the model? (1 for yes, 0 for no): "))
