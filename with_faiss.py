@@ -16,6 +16,7 @@ from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS as BaseFAISS
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import AIMessage, HumanMessage, SystemMessage
+from langchain.text_splitter import TextSplitter
 from langchain.document_loaders import (
     PyPDFLoader,
     CSVLoader,
@@ -154,7 +155,12 @@ def get_loader(file_path_or_url):
 def train_or_load_model(train, faiss_obj_path, file_path, index_name):
     if train:
         loader = get_loader(file_path)
-        pages = loader.load_and_split()
+        text_splitter = TextSplitter(chunk_size=6000)  # Create a TextSplitter with chunk_size of 5000
+        pages = loader.load_and_split(text_splitter)
+        for i in pages:
+            print("\n ______________")
+            # i.page_content = structured_chunk(i.page_content)
+            print(i.page_content)
 
         # Save pages to a text file
         with open('output.txt', 'w', encoding='utf-8') as f:
@@ -176,6 +182,16 @@ def train_or_load_model(train, faiss_obj_path, file_path, index_name):
         return FAISS.load(faiss_obj_path)
 
 
+def structured_chunk(message):
+    messages = [SystemMessage(
+        content="Please enhance and refine the following text to ensure clarity and standardization. Remove all "
+                "extraneous components, including HTML tags, miscellaneous characters, and any segments "
+                "translated by automatic systems like Google Translate."), HumanMessage(content=message)]
+
+    ai_response = chat(messages).content
+    return ai_response
+
+
 def answer_questions(faiss_index):
     messages = [
         SystemMessage(
@@ -191,6 +207,7 @@ def answer_questions(faiss_index):
             break
 
         docs = faiss_index.similarity_search(query=question, k=2)
+        print(docs)
 
         main_content = question + "\n\n"
         for doc in docs:
@@ -201,14 +218,13 @@ def answer_questions(faiss_index):
         messages.pop()
         messages.append(HumanMessage(content=question))
         messages.append(AIMessage(content=ai_response))
-        print(chat)
 
         print(ai_response)
 
 
 def main():
     faiss_obj_path = "models/ycla.pickle"
-    file_path = "https://yoursitecom"
+    file_path = "data/ycla_en.pdf"
     index_name = "ycla"
 
     train = int(input("Do you want to train the model? (1 for yes, 0 for no): "))
