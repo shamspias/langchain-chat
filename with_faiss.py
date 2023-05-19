@@ -1,8 +1,7 @@
 import os
 import sys
 import pickle
-import pyppeteer
-import asyncio
+import re
 import logging
 from abc import ABC, abstractmethod
 from typing import List
@@ -16,7 +15,7 @@ from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS as BaseFAISS
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import AIMessage, HumanMessage, SystemMessage
-from langchain.text_splitter import TextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.document_loaders import (
     PyPDFLoader,
     CSVLoader,
@@ -134,6 +133,16 @@ class URLHandler:
         return list(all_links)
 
 
+def remove_phrase(data, phrase):
+    # Create a pattern that matches the phrase and any words around it
+    pattern = re.compile(r'\b\w*?\s*' + re.escape(phrase) + r'\s*\w*\b', re.IGNORECASE)
+
+    # Remove the phrase and any surrounding words
+    cleaned_data = re.sub(pattern, '', data)
+
+    return cleaned_data
+
+
 def get_loader(file_path_or_url):
     if file_path_or_url.startswith("http://") or file_path_or_url.startswith("https://"):
         handle_website = URLHandler()
@@ -154,11 +163,14 @@ def get_loader(file_path_or_url):
 
 def train_or_load_model(train, faiss_obj_path, file_path, index_name):
     if train:
+        phrase = "Machine Translated by Google"
         loader = get_loader(file_path)
-        text_splitter = TextSplitter(chunk_size=6000)  # Create a TextSplitter with chunk_size of 5000
-        pages = loader.load_and_split(text_splitter)
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000,
+                                                       chunk_overlap=400)
+        pages = loader.load_and_split(text_splitter=text_splitter)
         for i in pages:
             print("\n ______________")
+            i.page_content = remove_phrase(i.page_content, phrase)  # remove if the data translate from google
             # i.page_content = structured_chunk(i.page_content)
             print(i.page_content)
 
