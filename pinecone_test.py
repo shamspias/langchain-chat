@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import Pinecone
 from langchain.chat_models import ChatOpenAI
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import (
     AIMessage,
     HumanMessage,
@@ -121,8 +122,11 @@ class PineconeIndexManager:
 
 def train_or_load_model(train, pinecone_index_manager, file_path, name_space):
     if train:
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000,
+                                                       chunk_overlap=400)
+
         loader = DocumentLoaderFactory.get_loader(file_path)
-        pages = loader.load_and_split()
+        pages = loader.load_and_split(text_splitter=text_splitter)
 
         if pinecone_index_manager.index_exists():
             print("Updating the model")
