@@ -150,9 +150,9 @@ def answer_questions(pinecone_index):
     messages = [
         SystemMessage(
             content='I want you to act as a document that I am having a conversation with. Your name is "AI '
-                    'Assistant". You will provide me with answers from the given info. If the answer is not included, '
-                    'say exactly "Hmm, I am not sure." and stop after that. Refuse to answer any question not about '
-                    'the info. Never break character.')
+                    'Assistant". You will provide me with answers from the given info from reference. If the answer '
+                    'is not included, in reference say exactly "Hmm, I am not sure or give answer by yourself." and '
+                    'stop after that. Refuse to answer any question not about the info in reference.')
     ]
     while True:
         question = input("Ask a question (type 'stop' to end): ")
@@ -161,7 +161,7 @@ def answer_questions(pinecone_index):
 
         docs = pinecone_index.similarity_search(query=question, k=1)
 
-        main_content = question + "\n\n"
+        main_content = question + "\n\nreference:\n"
         for doc in docs:
             main_content += doc.page_content + "\n\n"
 
@@ -177,8 +177,8 @@ def answer_questions(pinecone_index):
 def main():
     pinecone_manager = PineconeManager(PINECONE_API_KEY, PINECONE_ENVIRONMENT)
     pinecone_index_manager = PineconeIndexManager(pinecone_manager, PINECONE_INDEX_NAME)
-    file_path = "data/cuet.pdf"
-    name_space = "cuet"
+    file_path = "data/ycla.pdf"
+    name_space = "ycla"
 
     train = int(input("Do you want to train the model? (1 for yes, 0 for no): "))
     pinecone_index = train_or_load_model(train, pinecone_index_manager, file_path, name_space)
