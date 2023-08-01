@@ -152,10 +152,12 @@ def train_or_load_model(train, pinecone_index_manager, file_path, name_space):
 def answer_questions(pinecone_index):
     messages = [
         SystemMessage(
-            content='I want you to act as a document that I am having a conversation with. Your name is "AI '
-                    'Assistant". You will provide me with answers from the given info from reference. If the answer '
-                    'is not included, in reference say exactly "Hmm, I am not sure or give answer by yourself." and '
-                    'stop after that. Refuse to answer any question not about the info in reference.')
+            content='You will be provided with a document delimited by triple quotes and a question. Your task is to '
+                    'answer the question using only the provided document and to cite the passage(s) of the document '
+                    'used to answer the question. If the document does not contain the information needed to answer '
+                    'this question then simply write: "Insufficient information." If an answer to the question is '
+                    'provided, it must be annotated with a citation. Use the following format for to cite relevant '
+                    'passages ({"citation": …}).')
     ]
     while True:
         question = input("Ask a question (type 'stop' to end): ")
@@ -164,9 +166,12 @@ def answer_questions(pinecone_index):
 
         docs = pinecone_index.similarity_search(query=question, k=1)
 
-        main_content = question + "\n\nreference:\n"
+        main_content = '"""'
         for doc in docs:
             main_content += doc.page_content + "\n\n"
+
+        main_content += '"""\n\n\nQuestion: ' + question + "\n"
+        print(main_content)
 
         messages.append(HumanMessage(content=main_content))
         ai_response = chat(messages).content
