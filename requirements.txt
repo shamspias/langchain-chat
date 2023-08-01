@@ -6,4 +6,3 @@ pypdf
 tiktoken
 bs4
 faiss-cpu
-unstructured
