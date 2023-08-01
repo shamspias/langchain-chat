@@ -19,6 +19,7 @@ from langchain.document_loaders import (
     CSVLoader,
     UnstructuredWordDocumentLoader,
     WebBaseLoader,
+    TextLoader,
 )
 
 load_dotenv()
@@ -97,6 +98,8 @@ class DocumentLoaderFactory:
                 return PyPDFLoader(file_path_or_url)
             elif mime_type == 'text/csv':
                 return CSVLoader(file_path_or_url)
+            elif mime_type == 'text/plain':
+                return TextLoader(file_path_or_url)
             elif mime_type in ['application/msword',
                                'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
                 return UnstructuredWordDocumentLoader(file_path_or_url)
@@ -177,8 +180,8 @@ def answer_questions(pinecone_index):
 def main():
     pinecone_manager = PineconeManager(PINECONE_API_KEY, PINECONE_ENVIRONMENT)
     pinecone_index_manager = PineconeIndexManager(pinecone_manager, PINECONE_INDEX_NAME)
-    file_path = "data/ycla.pdf"
-    name_space = "ycla"
+    file_path = "data/shams.txt"
+    name_space = "shams"
 
     train = int(input("Do you want to train the model? (1 for yes, 0 for no): "))
     pinecone_index = train_or_load_model(train, pinecone_index_manager, file_path, name_space)
