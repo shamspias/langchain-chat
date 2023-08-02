@@ -224,7 +224,7 @@ def main():
     pinecone_manager = PineconeManager(PINECONE_API_KEY, PINECONE_ENVIRONMENT)
     pinecone_index_manager = PineconeIndexManager(pinecone_manager, PINECONE_INDEX_NAME)
     file_path = "data/shams.txt"
-    name_space = "test-2"
+    name_space = "test-3"
 
     train = int(input("Do you want to train the model? (1 for yes, 0 for no): "))
     pinecone_index = train_or_load_model(train, pinecone_index_manager, file_path, name_space)
