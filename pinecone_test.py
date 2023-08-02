@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlsplit
 from dotenv import load_dotenv
 from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import Pinecone
+from langchain.vectorstores import Pinecone as BasePinecone
 from langchain.chat_models import ChatOpenAI
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import (
@@ -21,6 +21,21 @@ from langchain.document_loaders import (
     WebBaseLoader,
     TextLoader,
 )
+from langchain.llms import OpenAIChat
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain.retrievers.document_compressors import LLMChainExtractor
+
+from typing import (
+    Any,
+    List,
+    Optional,
+    Type,
+    TypeVar,
+    Tuple
+)
+from langchain.embeddings.base import Embeddings
+
+VST = TypeVar("VST", bound="VectorStore")
 
 load_dotenv()
 
@@ -34,6 +49,29 @@ PINECONE_INDEX_NAME = os.getenv('PINECONE_INDEX_NAME')
 
 embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
 chat = ChatOpenAI(temperature=0, openai_api_key=OPENAI_API_KEY)
+
+chat_llm = OpenAIChat(model_name="gpt-3.5-turbo", temperature=0, openai_api_key=OPENAI_API_KEY)
+compressor = LLMChainExtractor.from_llm(chat_llm)
+
+
+class Pinecone(BasePinecone):
+    @classmethod
+    def from_texts(
+            cls: Type[VST],
+            texts: List[str],
+            embedding: Embeddings,
+            metadatas: Optional[List[dict]] = None,
+            **kwargs: Any,
+    ) -> Tuple[List[Tuple[str, List[float]]], VST]:
+        """Return VectorStore initialized from texts and embeddings."""
+
+        # Your existing code to initialize the vectorstore from texts
+        vectorstore = super().from_texts(texts, embedding, metadatas=metadatas, **kwargs)
+
+        # Now, get the embedded data
+        embedded_data = list(zip(texts, embedding.embed_documents(texts)))
+
+        return embedded_data, vectorstore  # Return the embedded data and the initialized VectorStore object
 
 
 class PineconeManager:
@@ -133,16 +171,12 @@ def train_or_load_model(train, pinecone_index_manager, file_path, name_space):
 
         if pinecone_index_manager.index_exists():
             print("Updating the model")
-            pinecone_index = Pinecone.from_documents(pages, embeddings, index_name=pinecone_index_manager.index_name,
-                                                     namespace=name_space)
+            embedded_data, pinecone_index = Pinecone.from_documents(pages, embeddings,
+                                                                    index_name=pinecone_index_manager.index_name,
+                                                                    namespace=name_space)
+            # print(embedded_data)
 
-        else:
-            print("Training the model")
-            pinecone_index_manager.create_index(dimension=1531, metric="cosine")
-            pinecone_index = Pinecone.from_documents(documents=pages, embedding=embeddings,
-                                                     index_name=pinecone_index_manager.index_name,
-                                                     namespace=name_space)
-        return pinecone_index
+            return pinecone_index
     else:
         pinecone_index = Pinecone.from_existing_index(index_name=pinecone_index_manager.index_name,
                                                       namespace=name_space, embedding=embeddings)
@@ -150,6 +184,7 @@ def train_or_load_model(train, pinecone_index_manager, file_path, name_space):
 
 
 def answer_questions(pinecone_index):
+    pinecone_index_retriever = pinecone_index.as_retriever()
     messages = [
         SystemMessage(
             content='You will be provided with a document delimited by triple quotes and a question. Your task is to '
@@ -164,8 +199,11 @@ def answer_questions(pinecone_index):
         if question.lower() == "stop":
             break
 
-        docs = pinecone_index.similarity_search(query=question, k=1)
+        compression_retriever = ContextualCompressionRetriever(base_compressor=compressor,
+                                                               base_retriever=pinecone_index_retriever)
 
+        # docs = pinecone_index_retriever.similarity_search(query=question, k=1)
+        docs = compression_retriever.get_relevant_documents(query=question)
         main_content = '"""'
         for doc in docs:
             main_content += doc.page_content + "\n\n"
@@ -186,7 +224,7 @@ def main():
     pinecone_manager = PineconeManager(PINECONE_API_KEY, PINECONE_ENVIRONMENT)
     pinecone_index_manager = PineconeIndexManager(pinecone_manager, PINECONE_INDEX_NAME)
     file_path = "data/shams.txt"
-    name_space = "shams"
+    name_space = "test-2"
 
     train = int(input("Do you want to train the model? (1 for yes, 0 for no): "))
     pinecone_index = train_or_load_model(train, pinecone_index_manager, file_path, name_space)
