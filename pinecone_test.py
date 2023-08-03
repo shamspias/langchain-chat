@@ -31,11 +31,7 @@ from typing import (
     Any,
     List,
     Optional,
-    Type,
-    Dict,
     TypeVar,
-    Tuple,
-    Iterable
 )
 from langchain.embeddings.base import Embeddings
 
@@ -124,19 +120,6 @@ class Pinecone(BasePinecone):
             index.upsert(vectors=list(to_upsert), namespace=namespace, **_upsert_kwargs)
 
         return cls(index, embedding.embed_query, text_key, namespace, **kwargs), ids_batch
-
-    @classmethod
-    def from_documents(
-            cls: Type[VST],
-            documents: List[Document],
-            embedding: Embeddings,
-            **kwargs: Any,
-    ) -> VST:
-        """Return VectorStore initialized from documents and embeddings."""
-        texts = [d.page_content for d in documents]
-
-        metadatas = [d.metadata for d in documents]
-        return cls.from_texts(texts, embedding, metadatas=metadatas, **kwargs)
 
 
 class PineconeManager:
