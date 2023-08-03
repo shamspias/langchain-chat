@@ -5,14 +5,17 @@ from langchain.document_loaders import CSVLoader
 from langchain.indexes import VectorstoreIndexCreator
 from langchain.chains import RetrievalQA
 from langchain.chat_models import ChatOpenAI
+from langchain.embeddings import OpenAIEmbeddings
 
 load_dotenv()
 
-OPENAI_API_KEY = os.getenv('OPEN_AI_KEY')
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+
+embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
 
 csv_loader = CSVLoader(file_path='data/property.csv')
 
-index_creator = VectorstoreIndexCreator(openai_api_key=OPENAI_API_KEY)
+index_creator = VectorstoreIndexCreator()
 document_search = index_creator.from_loaders([csv_loader])
 
 chat_chain = RetrievalQA.from_chain_type(llm=ChatOpenAI(), chain_type="stuff",

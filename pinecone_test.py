@@ -43,7 +43,7 @@ VST = TypeVar("VST", bound="VectorStore")
 load_dotenv()
 
 # Get the Variables from the .env file
-OPENAI_API_KEY = os.getenv('OPEN_AI_KEY')
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
 PINECONE_ENVIRONMENT = os.getenv('PINECONE_ENVIRONMENT')
 PINECONE_INDEX_NAME = os.getenv('PINECONE_INDEX_NAME')
