@@ -32,6 +32,7 @@ from typing import (
     List,
     Optional,
     Type,
+    Dict,
     TypeVar,
     Tuple,
     Iterable
@@ -57,96 +58,85 @@ compressor = LLMChainExtractor.from_llm(chat)
 
 
 class Pinecone(BasePinecone):
-    def add_texts(
-            self,
-            texts: Iterable[str],
-            metadatas: Optional[List[dict]] = None,
-            ids: Optional[List[str]] = None,
-            namespace: Optional[str] = None,
-            batch_size: int = 32,
-            **kwargs: Any,
-    ) -> List[str]:
-        """Run more texts through the embeddings and add to the vectorstore.
-
-        Args:
-            texts: Iterable of strings to add to the vectorstore.
-            metadatas: Optional list of metadatas associated with the texts.
-            ids: Optional list of ids to associate with the texts.
-            namespace: Optional pinecone namespace to add the texts to.
-
-        Returns:
-            List of ids from adding the texts into the vectorstore.
-
-        """
-        if namespace is None:
-            namespace = self._namespace
-        # Embed and create the documents
-        docs = []
-        ids = ids or [str(uuid.uuid4()) for _ in texts]
-        for i, text in enumerate(texts):
-            embedding = self._embedding_function(text)
-            metadata = metadatas[i] if metadatas else {}
-            metadata[self._text_key] = text
-            docs.append((ids[i], embedding, metadata))
-        # upsert to Pinecone
-        upsert_result = self._index.upsert(
-            vectors=docs, namespace=namespace, batch_size=batch_size, **kwargs
-        )
-        print("Upserted vector IDs:", list(upsert_result.keys()))
-        return ids
 
     @classmethod
-    def from_documents(
+    def from_texts(
             cls,
-            documents: List[Document],
+            texts: List[str],
             embedding: Embeddings,
+            metadatas: Optional[List[dict]] = None,
+            ids: Optional[List[str]] = None,
             batch_size: int = 32,
             text_key: str = "text",
             index_name: Optional[str] = None,
             namespace: Optional[str] = None,
             upsert_kwargs: Optional[dict] = None,
             **kwargs: Any,
-    ) -> BasePinecone:
-        """Construct Pinecone wrapper from raw documents.
+    ) -> tuple[BasePinecone, list[str]]:
 
-        This is a user friendly interface that:
-            1. Embeds documents.
-            2. Adds the documents to a provided Pinecone index
+        try:
+            import pinecone
+        except ImportError:
+            raise ValueError(
+                "Could not import pinecone python package. "
+                "Please install it with `pip install pinecone-client`."
+            )
 
-        This is intended to be a quick way to get started.
+        indexes = pinecone.list_indexes()  # checks if provided index exists
 
-        Example:
-            .. code-block:: python
+        if index_name in indexes:
+            index = pinecone.Index(index_name)
+        elif len(indexes) == 0:
+            raise ValueError(
+                "No active indexes found in your Pinecone project, "
+                "are you sure you're using the right API key and environment?"
+            )
+        else:
+            raise ValueError(
+                f"Index '{index_name}' not found in your Pinecone project. "
+                f"Did you mean one of the following indexes: {', '.join(indexes)}"
+            )
+        ids_batch = []
 
-                from langchain import Pinecone
-                from langchain.embeddings import OpenAIEmbeddings
-                import pinecone
+        for i in range(0, len(texts), batch_size):
+            # set end position of batch
+            i_end = min(i + batch_size, len(texts))
+            # get batch of texts and ids
+            lines_batch = texts[i:i_end]
+            # create ids if not provided
+            if ids:
+                ids_batch = ids[i:i_end]
+            else:
+                ids_batch = [str(uuid.uuid4()) for n in range(i, i_end)]
+            # create embeddings
+            embeds = embedding.embed_documents(lines_batch)
+            # prep metadata and upsert batch
+            if metadatas:
+                metadata = metadatas[i:i_end]
+            else:
+                metadata = [{} for _ in range(i, i_end)]
+            for j, line in enumerate(lines_batch):
+                metadata[j][text_key] = line
+            to_upsert = zip(ids_batch, embeds, metadata)
 
-                # The environment should be the one specified next to the API key
-                # in your Pinecone console
-                pinecone.init(api_key="***", environment="...")
-                embeddings = OpenAIEmbeddings()
-                pinecone = Pinecone.from_texts(
-                    texts,
-                    embeddings,
-                    index_name="langchain-demo"
-                )
-        """
-        texts = [doc.page_content for doc in documents]
-        metadatas = [doc.metadata for doc in documents]
-        ids = [doc.id for doc in documents]
-        return cls.from_texts(
-            texts,
-            embedding,
-            metadatas=metadatas,
-            ids=ids,
-            batch_size=batch_size,
-            text_key=text_key,
-            index_name=index_name,
-            namespace=namespace,
-            upsert_kwargs=upsert_kwargs,
-            **kwargs,
-        )
+            # upsert to Pinecone
+            _upsert_kwargs = upsert_kwargs or {}
+            index.upsert(vectors=list(to_upsert), namespace=namespace, **_upsert_kwargs)
+
+        return cls(index, embedding.embed_query, text_key, namespace, **kwargs), ids_batch
+
+    @classmethod
+    def from_documents(
+            cls: Type[VST],
+            documents: List[Document],
+            embedding: Embeddings,
+            **kwargs: Any,
+    ) -> VST:
+        """Return VectorStore initialized from documents and embeddings."""
+        texts = [d.page_content for d in documents]
+
+        metadatas = [d.metadata for d in documents]
+        return cls.from_texts(texts, embedding, metadatas=metadatas, **kwargs)
 
 
 class PineconeManager:
@@ -246,10 +236,11 @@ def train_or_load_model(train, pinecone_index_manager, file_path, name_space):
 
         if pinecone_index_manager.index_exists():
             print("Updating the model")
-            pinecone_index = Pinecone.from_documents(pages, embeddings,
-                                                     index_name=pinecone_index_manager.index_name,
-                                                     namespace=name_space)
-            # print(vector_ids)
+            pinecone_index, vector_ids = Pinecone.from_documents(pages, embeddings,
+                                                                 index_name=pinecone_index_manager.index_name,
+                                                                 namespace=name_space)
+            print(vector_ids)
+            # vector_ids = list(upsert_result.keys())
 
             return pinecone_index
     else:
@@ -299,7 +290,7 @@ def main():
     pinecone_manager = PineconeManager(PINECONE_API_KEY, PINECONE_ENVIRONMENT)
     pinecone_index_manager = PineconeIndexManager(pinecone_manager, PINECONE_INDEX_NAME)
     file_path = "data/shams.txt"
-    name_space = "test-3"
+    name_space = "shams"
 
     train = int(input("Do you want to train the model? (1 for yes, 0 for no): "))
     pinecone_index = train_or_load_model(train, pinecone_index_manager, file_path, name_space)
