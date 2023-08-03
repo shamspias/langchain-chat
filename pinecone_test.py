@@ -6,6 +6,8 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlsplit
 from dotenv import load_dotenv
 from langchain.embeddings import OpenAIEmbeddings
+from langchain.docstore.document import Document
+
 from langchain.vectorstores import Pinecone as BasePinecone
 from langchain.chat_models import ChatOpenAI
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -21,9 +23,9 @@ from langchain.document_loaders import (
     WebBaseLoader,
     TextLoader,
 )
-from langchain.llms import OpenAIChat
 from langchain.retrievers import ContextualCompressionRetriever
 from langchain.retrievers.document_compressors import LLMChainExtractor
+import uuid
 
 from typing import (
     Any,
@@ -31,7 +33,8 @@ from typing import (
     Optional,
     Type,
     TypeVar,
-    Tuple
+    Tuple,
+    Iterable
 )
 from langchain.embeddings.base import Embeddings
 
@@ -50,28 +53,100 @@ PINECONE_INDEX_NAME = os.getenv('PINECONE_INDEX_NAME')
 embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
 chat = ChatOpenAI(temperature=0, openai_api_key=OPENAI_API_KEY)
 
-chat_llm = OpenAIChat(model_name="gpt-3.5-turbo", temperature=0, openai_api_key=OPENAI_API_KEY)
-compressor = LLMChainExtractor.from_llm(chat_llm)
+compressor = LLMChainExtractor.from_llm(chat)
 
 
 class Pinecone(BasePinecone):
-    @classmethod
-    def from_texts(
-            cls: Type[VST],
-            texts: List[str],
-            embedding: Embeddings,
+    def add_texts(
+            self,
+            texts: Iterable[str],
             metadatas: Optional[List[dict]] = None,
+            ids: Optional[List[str]] = None,
+            namespace: Optional[str] = None,
+            batch_size: int = 32,
             **kwargs: Any,
-    ) -> Tuple[List[Tuple[str, List[float]]], VST]:
-        """Return VectorStore initialized from texts and embeddings."""
+    ) -> List[str]:
+        """Run more texts through the embeddings and add to the vectorstore.
 
-        # Your existing code to initialize the vectorstore from texts
-        vectorstore = super().from_texts(texts, embedding, metadatas=metadatas, **kwargs)
+        Args:
+            texts: Iterable of strings to add to the vectorstore.
+            metadatas: Optional list of metadatas associated with the texts.
+            ids: Optional list of ids to associate with the texts.
+            namespace: Optional pinecone namespace to add the texts to.
 
-        # Now, get the embedded data
-        embedded_data = list(zip(texts, embedding.embed_documents(texts)))
+        Returns:
+            List of ids from adding the texts into the vectorstore.
 
-        return embedded_data, vectorstore  # Return the embedded data and the initialized VectorStore object
+        """
+        if namespace is None:
+            namespace = self._namespace
+        # Embed and create the documents
+        docs = []
+        ids = ids or [str(uuid.uuid4()) for _ in texts]
+        for i, text in enumerate(texts):
+            embedding = self._embedding_function(text)
+            metadata = metadatas[i] if metadatas else {}
+            metadata[self._text_key] = text
+            docs.append((ids[i], embedding, metadata))
+        # upsert to Pinecone
+        upsert_result = self._index.upsert(
+            vectors=docs, namespace=namespace, batch_size=batch_size, **kwargs
+        )
+        print("Upserted vector IDs:", list(upsert_result.keys()))
+        return ids
+
+    @classmethod
+    def from_documents(
+            cls,
+            documents: List[Document],
+            embedding: Embeddings,
+            batch_size: int = 32,
+            text_key: str = "text",
+            index_name: Optional[str] = None,
+            namespace: Optional[str] = None,
+            upsert_kwargs: Optional[dict] = None,
+            **kwargs: Any,
+    ) -> BasePinecone:
+        """Construct Pinecone wrapper from raw documents.
+
+        This is a user friendly interface that:
+            1. Embeds documents.
+            2. Adds the documents to a provided Pinecone index
+
+        This is intended to be a quick way to get started.
+
+        Example:
+            .. code-block:: python
+
+                from langchain import Pinecone
+                from langchain.embeddings import OpenAIEmbeddings
+                import pinecone
+
+                # The environment should be the one specified next to the API key
+                # in your Pinecone console
+                pinecone.init(api_key="***", environment="...")
+                embeddings = OpenAIEmbeddings()
+                pinecone = Pinecone.from_texts(
+                    texts,
+                    embeddings,
+                    index_name="langchain-demo"
+                )
+        """
+        texts = [doc.page_content for doc in documents]
+        metadatas = [doc.metadata for doc in documents]
+        ids = [doc.id for doc in documents]
+        return cls.from_texts(
+            texts,
+            embedding,
+            metadatas=metadatas,
+            ids=ids,
+            batch_size=batch_size,
+            text_key=text_key,
+            index_name=index_name,
+            namespace=namespace,
+            upsert_kwargs=upsert_kwargs,
+            **kwargs,
+        )
 
 
 class PineconeManager:
@@ -171,10 +246,10 @@ def train_or_load_model(train, pinecone_index_manager, file_path, name_space):
 
         if pinecone_index_manager.index_exists():
             print("Updating the model")
-            embedded_data, pinecone_index = Pinecone.from_documents(pages, embeddings,
-                                                                    index_name=pinecone_index_manager.index_name,
-                                                                    namespace=name_space)
-            # print(embedded_data)
+            pinecone_index = Pinecone.from_documents(pages, embeddings,
+                                                     index_name=pinecone_index_manager.index_name,
+                                                     namespace=name_space)
+            # print(vector_ids)
 
             return pinecone_index
     else:
