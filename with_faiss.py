@@ -49,7 +49,8 @@ class WebBaseLoader(BaseWebBaseLoader):
     ) -> str:
         for i in range(retries):
             try:
-                webdriver_service = Service(CHROMEDRIVER_PATH)  # Update this path
+                #Path to chromedriver executable
+                webdriver_service = Service(CHROMEDRIVER_PATH)
                 options = webdriver.ChromeOptions()
                 options.add_argument('headless')
                 driver = webdriver.Chrome(service=webdriver_service, options=options)
