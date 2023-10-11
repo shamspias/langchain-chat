@@ -34,6 +34,7 @@ import time
 load_dotenv()
 logger = logging.getLogger(__name__)
 OPENAI_API_KEY = os.getenv('OPEN_AI_KEY')
+CHROMEDRIVER_PATH = os.getenv('CHROMEDRIVER_PATH')
 # WEBSITE_URL = os.getenv('WEBSITE_URLS')
 # WEBSITE_URLS = WEBSITE_URL.split(",")
 
@@ -48,7 +49,8 @@ class WebBaseLoader(BaseWebBaseLoader):
     ) -> str:
         for i in range(retries):
             try:
-                webdriver_service = Service('C:/WebDrivers/chromedriver.exe')  # Update this path
+                #Path to chromedriver executable
+                webdriver_service = Service(CHROMEDRIVER_PATH)
                 options = webdriver.ChromeOptions()
                 options.add_argument('headless')
                 driver = webdriver.Chrome(service=webdriver_service, options=options)
